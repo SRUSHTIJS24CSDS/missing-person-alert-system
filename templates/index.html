@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GUARDIAN — Missing Person Alert System</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #060810;
+  --panel: #0c1120;
+  --panel2: #111827;
+  --border: #1e2d4a;
+  --accent: #e63946;
+  --accent2: #00d4ff;
+  --accent3: #39ff14;
+  --warn: #ff9f1c;
+  --text: #c8d8f0;
+  --muted: #4a5a7a;
+  --font-display: 'Rajdhani', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-body: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+/* Scanline effect */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px);
+  pointer-events: none; z-index: 9999;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2rem;
+  height: 64px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo {
+  display: flex; align-items: center; gap: 12px;
+}
+.logo-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(230,57,70,0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(230,57,70,0); }
+}
+.logo-text {
+  font-family: var(--font-display);
+  font-size: 1.6rem; font-weight: 700; letter-spacing: 4px;
+  color: #fff;
+}
+.logo-sub {
+  font-family: var(--font-mono);
+  font-size: 0.6rem; color: var(--accent2); letter-spacing: 2px;
+  text-transform: uppercase; margin-top: 2px;
+}
+.header-stats {
+  display: flex; gap: 2rem;
+}
+.hstat {
+  text-align: right;
+}
+.hstat-val {
+  font-family: var(--font-mono);
+  font-size: 1.4rem; color: var(--accent2);
+}
+.hstat-lbl {
+  font-size: 0.6rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
+}
+.status-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--accent3);
+  animation: blink 1s infinite; margin-right: 6px;
+}
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+/* ── NAV ── */
+nav {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex; gap: 0;
+}
+.nav-btn {
+  padding: 0.8rem 1.8rem;
+  background: none; border: none;
+  font-family: var(--font-display); font-size: 0.95rem; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+.nav-btn:hover { color: var(--text); }
+.nav-btn.active { color: var(--accent2); border-color: var(--accent2); }
+
+/* ── LAYOUT ── */
+main {
+  max-width: 1400px; margin: 0 auto; padding: 2rem;
+}
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1.5rem;
+}
+.card-title {
+  font-family: var(--font-display); font-size: 1rem; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--accent2); margin-bottom: 1.2rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title::before {
+  content: ''; display: block;
+  width: 3px; height: 16px; background: var(--accent2);
+}
+
+/* ── SCAN SECTION ── */
+.scan-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+}
+@media (max-width: 900px) { .scan-grid { grid-template-columns: 1fr; } }
+
+#video-container {
+  position: relative;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  display: flex; align-items: center; justify-content: center;
+}
+#videoFeed, #previewImg, #resultImg {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.scan-overlay {
+  position: absolute; inset: 0;
+  border: 2px solid transparent;
+  pointer-events: none;
+  transition: border-color 0.3s;
+}
+.scan-overlay.scanning { border-color: var(--accent2); animation: scanpulse 1s infinite; }
+.scan-overlay.match { border-color: var(--accent3); }
+.scan-overlay.no-match { border-color: var(--accent); }
+@keyframes scanpulse {
+  0%,100% { box-shadow: inset 0 0 20px rgba(0,212,255,0.3); }
+  50% { box-shadow: inset 0 0 40px rgba(0,212,255,0.6); }
+}
+
+/* Scanning line */
+.scan-line {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: var(--accent2);
+  display: none; opacity: 0.8;
+}
+.scan-line.active {
+  display: block;
+  animation: scanline 2s linear infinite;
+}
+@keyframes scanline {
+  0% { top: 0; } 100% { top: 100%; }
+}
+
+.corner { position: absolute; width: 20px; height: 20px; }
+.corner.tl { top: 8px; left: 8px; border-top: 2px solid var(--accent2); border-left: 2px solid var(--accent2); }
+.corner.tr { top: 8px; right: 8px; border-top: 2px solid var(--accent2); border-right: 2px solid var(--accent2); }
+.corner.bl { bottom: 8px; left: 8px; border-bottom: 2px solid var(--accent2); border-left: 2px solid var(--accent2); }
+.corner.br { bottom: 8px; right: 8px; border-bottom: 2px solid var(--accent2); border-right: 2px solid var(--accent2); }
+
+.no-feed-msg {
+  text-align: center;
+  font-family: var(--font-mono);
+  color: var(--muted); font-size: 0.85rem;
+}
+.no-feed-icon { font-size: 3rem; margin-bottom: 1rem; }
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 0.7rem 1.5rem;
+  font-family: var(--font-display); font-size: 0.9rem; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  border: none; border-radius: 2px; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent); color: #fff;
+}
+.btn-primary:hover { background: #c1121f; box-shadow: 0 0 20px rgba(230,57,70,0.5); }
+.btn-secondary {
+  background: transparent; color: var(--accent2);
+  border: 1px solid var(--accent2);
+}
+.btn-secondary:hover { background: rgba(0,212,255,0.1); }
+.btn-success {
+  background: var(--accent3); color: #000;
+}
+.btn-warning {
+  background: var(--warn); color: #000;
+}
+.btn-danger { background: var(--accent); color: #fff; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-row { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-top: 1rem; }
+
+/* ── RESULT PANEL ── */
+.result-panel {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  min-height: 200px;
+  position: relative;
+  overflow: hidden;
+}
+.result-idle { color: var(--muted); text-align: center; padding-top: 2rem; }
+.match-found {
+  border-color: var(--accent3);
+  box-shadow: 0 0 30px rgba(57,255,20,0.15);
+}
+.no-match {
+  border-color: var(--accent);
+  box-shadow: 0 0 30px rgba(230,57,70,0.15);
+}
+.match-header {
+  font-family: var(--font-display); font-size: 1.3rem; font-weight: 700;
+  letter-spacing: 3px; margin-bottom: 1rem;
+}
+.match-header.positive { color: var(--accent3); }
+.match-header.negative { color: var(--accent); }
+
+.info-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.info-label { color: var(--muted); }
+.info-val { color: var(--text); }
+.confidence-bar {
+  height: 6px; background: var(--border); border-radius: 3px; margin-top: 0.5rem;
+  overflow: hidden;
+}
+.confidence-fill {
+  height: 100%; background: var(--accent3); border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* ── ALERT FLASH ── */
+#alertFlash {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-display); font-size: 1.2rem; font-weight: 700;
+  letter-spacing: 3px; text-align: center;
+  padding: 1rem;
+  z-index: 9998;
+  display: none;
+  animation: flashanim 0.3s ease;
+}
+@keyframes flashanim {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(0); }
+}
+
+/* ── DATABASE SECTION ── */
+.db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.person-card {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.person-card:hover { border-color: var(--accent2); transform: translateY(-2px); }
+.person-photo {
+  width: 100%; height: 160px; object-fit: cover;
+  background: var(--panel);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3rem;
+}
+.person-photo img { width: 100%; height: 100%; object-fit: cover; }
+.person-info { padding: 1rem; }
+.person-name {
+  font-family: var(--font-display); font-size: 1.1rem; font-weight: 700;
+  letter-spacing: 1px; color: #fff; margin-bottom: 0.3rem;
+}
+.person-detail { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.2rem; }
+.person-detail span { color: var(--text); }
+.person-actions { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
+
+/* ── FORM ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
+.form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.form-group.full { grid-column: 1/-1; }
+label {
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
+}
+input, textarea, select {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: var(--font-body); font-size: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input:focus, textarea:focus { border-color: var(--accent2); }
+.photo-drop {
+  border: 2px dashed var(--border);
+  border-radius: 4px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted);
+}
+.photo-drop:hover, .photo-drop.drag-over { border-color: var(--accent2); color: var(--accent2); }
+.photo-preview { max-height: 120px; margin-top: 0.5rem; border-radius: 4px; }
+
+/* ── ALERTS TABLE ── */
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th {
+  background: var(--panel2);
+  font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted);
+  padding: 0.8rem 1rem; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(30,45,74,0.5);
+  color: var(--text);
+}
+tr:hover td { background: rgba(0,212,255,0.03); }
+.badge {
+  display: inline-block; padding: 0.2rem 0.6rem;
+  border-radius: 2px; font-size: 0.7rem; font-weight: 600; letter-spacing: 1px;
+}
+.badge-match { background: rgba(57,255,20,0.15); color: var(--accent3); }
+.badge-high { background: rgba(230,57,70,0.15); color: var(--accent); }
+
+/* ── WEBCAM MODE ── */
+.webcam-controls {
+  display: flex; flex-direction: column; gap: 0.8rem;
+}
+.mode-selector {
+  display: flex; gap: 0.5rem;
+}
+.mode-btn {
+  flex: 1; padding: 0.7rem;
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 2px; color: var(--muted);
+  font-family: var(--font-mono); font-size: 0.75rem;
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.mode-btn.active { background: rgba(0,212,255,0.1); border-color: var(--accent2); color: var(--accent2); }
+
+.toast {
+  position: fixed; bottom: 2rem; right: 2rem;
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1rem 1.5rem;
+  font-family: var(--font-mono); font-size: 0.8rem;
+  z-index: 9997; display: none;
+  animation: slideUp 0.3s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="alertFlash">🚨 MATCH DETECTED — MISSING PERSON IDENTIFIED</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div>
+      <div class="logo-text">GUARDIAN</div>
+      <div class="logo-sub">Missing Person Alert System v1.0</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="hstat">
+      <div class="hstat-val" id="hMissing">0</div>
+      <div class="hstat-lbl">In Database</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="hAlerts">0</div>
+      <div class="hstat-lbl">Total Alerts</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val"><span class="status-dot"></span><span id="hAlerts24">0</span></div>
+      <div class="hstat-lbl">Last 24h</div>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button class="nav-btn active" onclick="showSection('scan')">⬡ Live Scan</button>
+  <button class="nav-btn" onclick="showSection('database')">⬡ Database</button>
+  <button class="nav-btn" onclick="showSection('add')">⬡ Add Person</button>
+  <button class="nav-btn" onclick="showSection('alerts')">⬡ Alert Log</button>
+</nav>
+
+<main>
+
+  <!-- ── SCAN SECTION ── -->
+  <div class="section active" id="section-scan">
+    <div class="scan-grid">
+      <!-- Video/Image Panel -->
+      <div class="card">
+        <div class="card-title">Input Feed</div>
+        <div id="video-container">
+          <div class="scan-overlay" id="scanOverlay">
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+            <div class="scan-line" id="scanLine"></div>
+          </div>
+          <video id="videoFeed" autoplay playsinline style="display:none;"></video>
+          <img id="previewImg" style="display:none;"/>
+          <img id="resultImg" style="display:none;"/>
+          <div class="no-feed-msg" id="noFeedMsg">
+            <div class="no-feed-icon">📷</div>
+            <div>Select input mode below</div>
+            <div style="margin-top:0.5rem;font-size:0.7rem;color:var(--muted)">AWAITING SIGNAL...</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <div class="mode-selector" style="width:100%">
+            <div class="mode-btn active" id="modeWebcam" onclick="setMode('webcam')">📷 Webcam</div>
+            <div class="mode-btn" id="modeUpload" onclick="setMode('upload')">🖼 Upload</div>
+          </div>
+        </div>
+
+        <!-- Webcam controls -->
+        <div id="webcamControls" class="webcam-controls" style="margin-top:0.8rem;">
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="startCamBtn" onclick="startWebcam()">▶ Start Camera</button>
+            <button class="btn btn-danger" id="stopCamBtn" onclick="stopWebcam()" disabled>■ Stop</button>
+            <button class="btn btn-primary" id="captureBtn" onclick="captureFrame()" disabled>⊙ Capture & Scan</button>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--muted)" id="camStatus">Camera offline</div>
+        </div>
+
+        <!-- Upload controls -->
+        <div id="uploadControls" style="display:none;margin-top:0.8rem;">
+          <input type="file" id="imageUpload" accept="image/*" onchange="handleUpload(event)" style="display:none"/>
+          <button class="btn btn-secondary" onclick="document.getElementById('imageUpload').click()">📁 Choose Image</button>
+          <button class="btn btn-primary" id="scanUploadBtn" onclick="scanUploadedImage()" disabled>🔍 Scan Image</button>
+        </div>
+
+        <div style="margin-top:1rem;">
+          <label>Scan Location (optional)</label>
+          <input type="text" id="locationInput" placeholder="e.g. Main Gate Camera, Railway Station..."/>
+        </div>
+      </div>
+
+      <!-- Results Panel -->
+      <div>
+        <div class="card" style="margin-bottom:1rem;">
+          <div class="card-title">Scan Results</div>
+          <div class="result-panel" id="resultPanel">
+            <div class="result-idle">
+              <div style="font-size:2rem;margin-bottom:0.5rem;">🔍</div>
+              <div>AWAITING SCAN</div>
+              <div style="color:var(--muted);margin-top:0.3rem;font-size:0.7rem">Start camera or upload an image</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Live Log</div>
+          <div id="liveLog" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);height:120px;overflow-y:auto;">
+            <div>[GUARDIAN] System initialized. Ready to scan.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DATABASE ── -->
+  <div class="section" id="section-database">
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+        <span>Missing Persons Database</span>
+        <button class="btn btn-secondary" onclick="loadPersons()">↺ Refresh</button>
+      </div>
+      <div class="db-grid" id="dbGrid">
+        <div style="color:var(--muted);font-family:var(--font-mono);font-size:0.8rem;">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADD PERSON ── -->
+  <div class="section" id="section-add">
+    <div class="card" style="max-width:700px;margin:0 auto;">
+      <div class="card-title">Register Missing Person</div>
+      <div class="form-grid" id="addForm">
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="f_name" placeholder="Enter full name"/>
+        </div>
+        <div class="form-group">
+          <label>Age</label>
+          <input type="number" id="f_age" placeholder="Age in years"/>
+        </div>
+        <div class="form-group">
+          <label>Last Seen Location</label>
+          <input type="text" id="f_last_seen" placeholder="City, area, landmark..."/>
+        </div>
+        <div class="form-group">
+          <label>Contact Number</label>
+          <input type="text" id="f_contact" placeholder="Family contact"/>
+        </div>
+        <div class="form-group full">
+          <label>Description</label>
+          <textarea id="f_desc" rows="3" placeholder="Physical description, clothing, circumstances..."></textarea>
+        </div>
+        <div class="form-group full">
+          <label>Photo *</label>
+          <div class="photo-drop" id="photoDrop"
+               onclick="document.getElementById('photoFile').click()"
+               ondragover="event.preventDefault();this.classList.add('drag-over')"
+               ondragleave="this.classList.remove('drag-over')"
+               ondrop="handleDrop(event)">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">📸</div>
+            <div>Click or drag a clear face photo here</div>
+            <div style="font-size:0.65rem;margin-top:0.4rem;color:var(--muted)">JPG, PNG — clear front-facing photo required</div>
+            <img id="photoPreview" class="photo-preview" style="display:none;"/>
+          </div>
+          <input type="file" id="photoFile" accept="image/*" style="display:none" onchange="previewPhoto(event)"/>
+        </div>
+        <div class="form-group full">
+          <button class="btn btn-primary" onclick="submitPerson()" style="width:100%;">⊕ Register to Database</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ALERTS ── -->
+  <div class="section" id="section-alerts">
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+        <span>Detection Alert Log</span>
+        <div style="display:flex;gap:0.5rem">
+          <button class="btn btn-secondary" onclick="loadAlerts()">↺ Refresh</button>
+          <button class="btn btn-danger" onclick="clearAlerts()">✕ Clear All</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Person</th>
+              <th>Confidence</th>
+              <th>Found At</th>
+              <th>GPS Location</th>
+              <th>SMS Sent</th>
+              <th>Detected At</th>
+            </tr>
+          </thead>
+          <tbody id="alertsBody">
+            <tr><td colspan="7" style="text-align:center;color:var(--muted);font-family:var(--font-mono);">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+let activeMode = 'webcam';
+let stream = null;
+let uploadedImage = null;
+
+// ── Buzzer / Siren Sound ──
+function playBuzzerAlert() {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const beep = (startTime, freq, duration) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0.35, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+    // 5-beep siren: high-low-high-low-high
+    const now = ctx.currentTime;
+    beep(now,       880, 0.18);
+    beep(now + 0.22, 440, 0.18);
+    beep(now + 0.44, 880, 0.18);
+    beep(now + 0.66, 440, 0.18);
+    beep(now + 0.88, 880, 0.25);
+  } catch(e) { console.warn('Audio not available:', e); }
+}
+
+// ── Navigation ──
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  event.target.classList.add('active');
+  if (id === 'database') loadPersons();
+  if (id === 'alerts') loadAlerts();
+}
+
+// ── Mode ──
+function setMode(mode) {
+  activeMode = mode;
+  document.getElementById('modeWebcam').classList.toggle('active', mode === 'webcam');
+  document.getElementById('modeUpload').classList.toggle('active', mode === 'upload');
+  document.getElementById('webcamControls').style.display = mode === 'webcam' ? '' : 'none';
+  document.getElementById('uploadControls').style.display = mode === 'upload' ? '' : 'none';
+  if (mode === 'upload') stopWebcam();
+}
+
+// ── Webcam ──
+async function startWebcam() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const v = document.getElementById('videoFeed');
+    v.srcObject = stream; v.style.display = '';
+    document.getElementById('noFeedMsg').style.display = 'none';
+    document.getElementById('previewImg').style.display = 'none';
+    document.getElementById('resultImg').style.display = 'none';
+    document.getElementById('startCamBtn').disabled = true;
+    document.getElementById('stopCamBtn').disabled = false;
+    document.getElementById('captureBtn').disabled = false;
+    document.getElementById('camStatus').textContent = '● CAMERA ONLINE';
+    document.getElementById('camStatus').style.color = 'var(--accent3)';
+    document.getElementById('scanLine').classList.add('active');
+    log('Camera started successfully.');
+  } catch(e) {
+    log('ERROR: Camera access denied — ' + e.message);
+    showToast('Camera access denied. Please allow camera permissions.', 'error');
+  }
+}
+
+function stopWebcam() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  document.getElementById('videoFeed').style.display = 'none';
+  document.getElementById('noFeedMsg').style.display = '';
+  document.getElementById('startCamBtn').disabled = false;
+  document.getElementById('stopCamBtn').disabled = true;
+  document.getElementById('captureBtn').disabled = true;
+  document.getElementById('camStatus').textContent = 'Camera offline';
+  document.getElementById('camStatus').style.color = 'var(--muted)';
+  document.getElementById('scanLine').classList.remove('active');
+  log('Camera stopped.');
+}
+
+function captureFrame() {
+  const v = document.getElementById('videoFeed');
+  const canvas = document.createElement('canvas');
+  canvas.width = v.videoWidth; canvas.height = v.videoHeight;
+  canvas.getContext('2d').drawImage(v, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg');
+  scanImage(dataUrl);
+}
+
+// ── Upload ──
+function handleUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    uploadedImage = ev.target.result;
+    document.getElementById('previewImg').src = uploadedImage;
+    document.getElementById('previewImg').style.display = '';
+    document.getElementById('noFeedMsg').style.display = 'none';
+    document.getElementById('resultImg').style.display = 'none';
+    document.getElementById('scanUploadBtn').disabled = false;
+    log('Image loaded: ' + file.name);
+  };
+  reader.readAsDataURL(file);
+}
+
+function scanUploadedImage() {
+  if (uploadedImage) scanImage(uploadedImage);
+}
+
+// ── Core Scan ──
+async function scanImage(dataUrl) {
+  const overlay = document.getElementById('scanOverlay');
+  const scanLine = document.getElementById('scanLine');
+  overlay.className = 'scan-overlay scanning';
+  scanLine.classList.add('active');
+  log('Scanning... sending to AI engine.');
+
+  document.getElementById('resultPanel').innerHTML = `
+    <div class="result-idle">
+      <div style="font-size:2rem;margin-bottom:0.5rem;animation:pulse 0.5s infinite">⚡</div>
+      <div>PROCESSING...</div>
+    </div>`;
+
+  // Get GPS coordinates and convert them to a readable location
+let gps_lat = null;
+let gps_lon = null;
+let location = document.getElementById('locationInput').value.trim();
+
+try {
+  const pos = await new Promise((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      reject,
+      {
+        enableHighAccuracy: true,
+        timeout: 5000
+      }
+    )
+  );
+
+  gps_lat = pos.coords.latitude;
+  gps_lon = pos.coords.longitude;
+
+  log(`GPS acquired: ${gps_lat.toFixed(5)}, ${gps_lon.toFixed(5)}`);
+
+  // If user did not type a location, fetch a readable address
+  if (!location) {
+    const geoResp = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${gps_lat}&lon=${gps_lon}`
+    );
+
+    const geoData = await geoResp.json();
+
+    if (geoData && geoData.display_name) {
+      location = geoData.display_name;
+      log(`Resolved location: ${location}`);
+    }
+  }
+
+} catch (err) {
+  log('GPS/location unavailable.');
+}
+
+// Final fallback
+if (!location && gps_lat && gps_lon) {
+  location = `${gps_lat.toFixed(5)}, ${gps_lon.toFixed(5)}`;
+}
+
+if (!location) {
+  location = "Unknown Location";
+}
+
+  try {
+    const resp = await fetch('/api/scan_image', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ image: dataUrl, location, gps_lat, gps_lon })
+    });
+    const data = await resp.json();
+    handleScanResult(data);
+
+    // Show annotated image
+    const ri = document.getElementById('resultImg');
+    ri.src = data.annotated_image;
+    ri.style.display = '';
+    document.getElementById('previewImg').style.display = 'none';
+    if (stream) document.getElementById('videoFeed').style.display = 'none';
+    document.getElementById('noFeedMsg').style.display = 'none';
+
+  } catch(e) {
+    log('ERROR: ' + e.message);
+    showToast('Scan failed. Is the server running?', 'error');
+    overlay.className = 'scan-overlay';
+  }
+}
+
+function handleScanResult(data) {
+  const panel = document.getElementById('resultPanel');
+  const overlay = document.getElementById('scanOverlay');
+
+  log(`Scan complete. Faces detected: ${data.faces_detected}`);
+
+  if (data.matches && data.matches.length > 0) {
+    const m = data.matches[0];
+    overlay.className = 'scan-overlay match';
+
+    // Flash alert banner
+    const flash = document.getElementById('alertFlash');
+    flash.style.display = 'block';
+    setTimeout(() => flash.style.display = 'none', 5000);
+
+    // Buzzer sound — multi-beep siren pattern
+    playBuzzerAlert();
+    log(`🚨 MATCH FOUND: ${m.name} (${m.confidence}% confidence)`);
+    if (m.sms_sent) log('📱 SMS alert sent to registered contact!');
+
+    // Build GPS / maps section
+    let locationHTML = '';
+    if (m.gps_lat && m.gps_lon) {
+      const mapsUrl = `https://maps.google.com/?q=${m.gps_lat},${m.gps_lon}`;
+      locationHTML = `
+        <div class="info-row">
+          <span class="info-label">GPS COORDS</span>
+          <span class="info-val">${m.gps_lat.toFixed(5)}, ${m.gps_lon.toFixed(5)}</span>
+        </div>
+        <div style="margin-top:0.5rem">
+          <a href="${mapsUrl}" target="_blank"
+             style="color:var(--accent2);font-size:0.75rem;text-decoration:none;font-family:var(--font-mono)">
+            📍 Open in Google Maps →
+          </a>
+        </div>`;
+    }
+
+    panel.className = 'result-panel match-found';
+    panel.innerHTML = `
+      <div class="match-header positive">🚨 MATCH IDENTIFIED</div>
+
+      <div style="margin-bottom:0.8rem;padding:0.5rem 0.8rem;background:rgba(57,255,20,0.07);border-left:3px solid var(--accent3);border-radius:2px">
+        <div style="font-family:var(--font-display);font-size:1.1rem;color:#fff;letter-spacing:1px">${m.name}</div>
+        <div style="font-size:0.7rem;color:var(--muted)">Age: ${m.age || 'Unknown'} &nbsp;|&nbsp; ${m.description || ''}</div>
+      </div>
+
+      <div class="info-row"><span class="info-label">CONFIDENCE</span>
+        <span class="info-val" style="color:var(--accent3)">${m.confidence}%</span></div>
+      <div class="confidence-bar"><div class="confidence-fill" style="width:${m.confidence}%"></div></div>
+
+      <div class="info-row" style="margin-top:0.6rem">
+        <span class="info-label">LAST KNOWN LOCATION</span>
+        <span class="info-val" style="color:var(--warn)">${m.last_seen || 'Not recorded'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">FOUND AT</span>
+        <span class="info-val">${m.current_location}</span>
+      </div>
+      ${locationHTML}
+      <div class="info-row" style="margin-top:0.3rem">
+        <span class="info-label">FAMILY CONTACT</span>
+        <span class="info-val" style="color:var(--accent2)">${m.contact || 'Not provided'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">SMS ALERT</span>
+        <span class="info-val" style="color:${m.sms_sent ? 'var(--accent3)' : 'var(--warn)'}">
+          ${m.sms_sent ? '✅ Sent' : '⚠ Not configured'}
+        </span>
+      </div>
+      <div style="margin-top:1rem;padding:0.7rem;background:rgba(57,255,20,0.05);border:1px solid rgba(57,255,20,0.2);border-radius:2px;font-size:0.7rem;color:var(--accent3)">
+        ⚠ ALERT LOGGED — Contact authorities immediately
+      </div>`;
+
+    updateStats();
+  } else {
+    overlay.className = 'scan-overlay no-match';
+    log(`No matches found. ${data.faces_detected} face(s) detected, none in database.`);
+    panel.className = 'result-panel no-match';
+    panel.innerHTML = `
+      <div class="match-header negative">⬛ NO MATCH FOUND</div>
+      <div class="info-row"><span class="info-label">FACES DETECTED</span><span class="info-val">${data.faces_detected}</span></div>
+      <div class="info-row"><span class="info-label">DATABASE STATUS</span><span class="info-val">Checked</span></div>
+      <div class="info-row"><span class="info-label">RESULT</span><span class="info-val" style="color:var(--accent)">NO MATCH</span></div>
+      <div style="margin-top:1rem;color:var(--muted);font-size:0.75rem;">
+        ${data.faces_detected === 0 ? 'No faces detected in image. Try better lighting.' : 'Person not in missing persons database.'}
+      </div>`;
+  }
+}
+
+// ── Database ──
+async function loadPersons() {
+  const grid = document.getElementById('dbGrid');
+  grid.innerHTML = '<div style="color:var(--muted);font-family:var(--font-mono);font-size:0.8rem;">Loading database...</div>';
+  const resp = await fetch('/api/persons');
+  const persons = await resp.json();
+  if (!persons.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-family:var(--font-mono);font-size:0.8rem;grid-column:1/-1">No persons registered. Add someone using the "Add Person" tab.</div>';
+    return;
+  }
+  grid.innerHTML = persons.map(p => `
+    <div class="person-card">
+      <div class="person-photo">
+        ${p.photo_b64 ? `<img src="data:image/jpeg;base64,${p.photo_b64}" alt="${p.name}"/>` : '👤'}
+      </div>
+      <div class="person-info">
+        <div class="person-name">${p.name}</div>
+        <div class="person-detail">Age: <span>${p.age || 'Unknown'}</span></div>
+        <div class="person-detail">Last Seen: <span>${p.last_seen || 'Unknown'}</span></div>
+        <div class="person-detail">Contact: <span>${p.contact || '—'}</span></div>
+        ${p.description ? `<div class="person-detail" style="margin-top:0.3rem">${p.description.substring(0,80)}${p.description.length>80?'...':''}</div>` : ''}
+        <div class="person-actions">
+          <button class="btn btn-danger" style="font-size:0.7rem;padding:0.3rem 0.8rem;" onclick="deletePerson(${p.id}, '${p.name}')">Remove</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function deletePerson(id, name) {
+  if (!confirm(`Remove ${name} from database?`)) return;
+  await fetch(`/api/persons/${id}`, {method:'DELETE'});
+  log(`Removed: ${name}`);
+  loadPersons();
+  updateStats();
+}
+
+// ── Add Person ──
+function previewPhoto(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = document.getElementById('photoPreview');
+    img.src = ev.target.result; img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('photoDrop').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    document.getElementById('photoFile').files = e.dataTransfer.files;
+    previewPhoto({target: {files: [file]}});
+  }
+}
+
+async function submitPerson() {
+  const name = document.getElementById('f_name').value.trim();
+  const photoFile = document.getElementById('photoFile').files[0];
+  if (!name) { showToast('Name is required.', 'error'); return; }
+  if (!photoFile) { showToast('A photo is required for face recognition.', 'error'); return; }
+
+  const fd = new FormData();
+  fd.append('name', name);
+  fd.append('age', document.getElementById('f_age').value);
+  fd.append('last_seen', document.getElementById('f_last_seen').value);
+  fd.append('contact', document.getElementById('f_contact').value);
+  fd.append('description', document.getElementById('f_desc').value);
+  fd.append('photo', photoFile);
+
+  const resp = await fetch('/api/persons', {method:'POST', body: fd});
+  const data = await resp.json();
+  showToast(data.message, 'success');
+  log(`Added: ${name}`);
+  updateStats();
+
+  // Reset form
+  ['f_name','f_age','f_last_seen','f_contact','f_desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('photoFile').value = '';
+  document.getElementById('photoPreview').style.display = 'none';
+}
+
+// ── Alerts ──
+async function loadAlerts() {
+  const tbody = document.getElementById('alertsBody');
+  const resp = await fetch('/api/alerts');
+  const alerts = await resp.json();
+  if (!alerts.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);font-family:var(--font-mono);">No alerts recorded yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = alerts.map((a, i) => {
+    let gpsCell = '<span style="color:var(--muted)">—</span>';
+    if (a.gps_lat && a.gps_lon) {
+      const url = `https://maps.google.com/?q=${a.gps_lat},${a.gps_lon}`;
+      gpsCell = `<a href="${url}" target="_blank" style="color:var(--accent2);text-decoration:none;font-size:0.75rem">📍 ${parseFloat(a.gps_lat).toFixed(4)}, ${parseFloat(a.gps_lon).toFixed(4)}</a>`;
+    }
+    return `
+    <tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td style="font-weight:600;color:#fff">${a.person_name}</td>
+      <td><span class="badge ${a.confidence>80?'badge-match':'badge-high'}">${a.confidence}%</span></td>
+      <td style="color:var(--muted)">${a.location || '—'}</td>
+      <td>${gpsCell}</td>
+      <td><span class="badge ${a.sms_sent?'badge-match':'badge-high'}">${a.sms_sent ? '✅ Sent' : '✗ No'}</span></td>
+      <td style="font-family:var(--font-mono);font-size:0.75rem">${new Date(a.detected_at).toLocaleString()}</td>
+    </tr>`; }).join('');
+}
+
+async function clearAlerts() {
+  if (!confirm('Clear all alerts?')) return;
+  await fetch('/api/alerts', {method:'DELETE'});
+  loadAlerts(); updateStats();
+}
+
+// ── Stats ──
+async function updateStats() {
+  const resp = await fetch('/api/stats');
+  const s = await resp.json();
+  document.getElementById('hMissing').textContent = s.total_missing;
+  document.getElementById('hAlerts').textContent = s.total_alerts;
+  document.getElementById('hAlerts24').textContent = s.alerts_24h;
+}
+
+// ── Utilities ──
+function log(msg) {
+  const el = document.getElementById('liveLog');
+  const now = new Date().toLocaleTimeString();
+  el.innerHTML += `<div>[${now}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  t.style.borderColor = type === 'error' ? 'var(--accent)' : type === 'success' ? 'var(--accent3)' : 'var(--border)';
+  t.style.color = type === 'error' ? 'var(--accent)' : type === 'success' ? 'var(--accent3)' : 'var(--text)';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+// ── Init ──
+updateStats();
+setInterval(updateStats, 30000);
+</script>
+</body>
+</html>
